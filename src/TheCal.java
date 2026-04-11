@@ -18,10 +18,9 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
     static DefaultTableModel mtabelCal;
 
     public static void main (String args[]){
-        mainFrame = new JFrame ("LibreCalendar"); 
-        mainFrame.setSize(1050, 480); 
+        mainFrame = new JFrame ("LibreCalendar");
         pane = mainFrame.getContentPane();
-        pane.setLayout(null); 
+        pane.setLayout(new BorderLayout()); 
         mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         
         LabelMonth = new JLabel ("January"); 
@@ -33,7 +32,7 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
         mtabelCal = new DefaultTableModel(){public boolean isCellEditable(int rowIndex, int mColIndex){return false;}};
         tabelCal = new JTable(mtabelCal);
         theScrollPane = new JScrollPane(tabelCal);
-        panelCal = new JPanel(null);
+        panelCal = new JPanel(new BorderLayout());
         
         panelCal.setBorder(BorderFactory.createTitledBorder("Calendar"));
         
@@ -41,31 +40,27 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
         buttonNext.addActionListener(new buttonNext_Action());
         comboYear.addActionListener(new comboYear_Action());
         
-        pane.add(panelCal);
-        panelCal.add(LabelMonth);
-        panelCal.add(comboYear);
-        panelCal.add(buttonPrev);
-        panelCal.add(buttonNext);
-        panelCal.add(theScrollPane);
-        
-        panelCal.setBounds(0, 0, 1920, 1920);
-        LabelMonth.setBounds(180, 50, 200, 50);
-        comboYear.setBounds(550, 52, 100, 30);
-        buttonPrev.setBounds(10, 25, 150, 40);
-        buttonNext.setBounds(900, 25, 150, 40);
-        theScrollPane.setBounds(10, 100, 1040, 525);
+        JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
+        headerPanel.add(buttonPrev);
+        headerPanel.add(LabelMonth);
+        headerPanel.add(comboYear);
+        headerPanel.add(buttonNext);
+                
+
+        panelCal.add(headerPanel, BorderLayout.NORTH);
+        panelCal.add(theScrollPane, BorderLayout.CENTER);
+        pane.add(panelCal, BorderLayout.CENTER);
         
         mainFrame.setResizable(true);
-        mainFrame.setVisible(true);
         
-        GregorianCalendar cal = new GregorianCalendar(); //Create calendar
-        Day = cal.get(GregorianCalendar.DAY_OF_MONTH); //Get day
-        Month = cal.get(GregorianCalendar.MONTH); //Get month
-        Year = cal.get(GregorianCalendar.YEAR); //Get year
-        currentMonth = Month; //Match month and year
+        GregorianCalendar cal = new GregorianCalendar(); 
+        Day = cal.get(GregorianCalendar.DAY_OF_MONTH);
+        Month = cal.get(GregorianCalendar.MONTH);
+        Year = cal.get(GregorianCalendar.YEAR);
+        currentMonth = Month;
         currentYear = Year;
             
-        String[] headers = {"Sun","Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}; //All headers
+        String[] headers = {"Sun","Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
         for (int i=0; i<7; i++){
             mtabelCal.addColumn(headers[i]);
         }
@@ -95,6 +90,9 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
         });
 
         refreshCalendar (Month, Year);
+        mainFrame.setMinimumSize(new Dimension(800, 450));
+        mainFrame.pack();
+        mainFrame.setVisible(true);
     }
     
     public static void refreshCalendar(int month, int year){
