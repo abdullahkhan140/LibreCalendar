@@ -3,22 +3,53 @@ import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
+import java.util.prefs.Preferences; // added for saving light/dark mode preference across sessions
 
 public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelfel
     // Modified by Arek Gubala
     
     static JLabel LabelMonth;
-    static JButton buttonPrev, buttonNext;
+    static JButton buttonPrev, buttonNext, buttonDarkMode;
     static JTable tabelCal;
     static JComboBox comboYear;
     static JFrame mainFrame;
     static Container pane;
     static JScrollPane theScrollPane;
-    static JPanel panelCal;
+    static JPanel panelCal, headerPanel;
     static int todayYear, todayMonth, todayDay, currentYear, currentMonth;
     static DefaultTableModel mtabelCal;
+    static boolean darkMode = false; // [ADDED] tracks current theme state
+
+    // color palette for both light and dark mode
+    static final Color LIGHT_BG           = Color.white;
+    static final Color LIGHT_TEXT         = Color.black;
+    static final Color LIGHT_TODAY        = new Color(255, 220, 220);
+    static final Color LIGHT_WEEKEND      = new Color(235, 235, 255);
+    static final Color LIGHT_SELECTED     = new Color(204, 255, 204);
+    static final Color LIGHT_INACTIVE_FG  = new Color(180, 180, 180);
+    static final Color LIGHT_INACTIVE_WKD = new Color(245, 245, 255);
+    static final Color LIGHT_INACTIVE_WKD2= new Color(250, 250, 250);
+    static final Color LIGHT_SEL_INACTIVE = new Color(235, 255, 235);
+    static final Color LIGHT_HEADER       = new Color(238, 238, 238);
+ 
+    static final Color DARK_BG            = new Color(30, 30, 30);
+    static final Color DARK_TEXT          = new Color(220, 220, 220);
+    static final Color DARK_TODAY         = new Color(120, 50, 50);
+    static final Color DARK_WEEKEND       = new Color(40, 40, 70);
+    static final Color DARK_SELECTED      = new Color(40, 80, 40);
+    static final Color DARK_INACTIVE_FG   = new Color(90, 90, 90);
+    static final Color DARK_INACTIVE_WKD  = new Color(35, 35, 55);
+    static final Color DARK_INACTIVE_WKD2 = new Color(28, 28, 28);
+    static final Color DARK_SEL_INACTIVE  = new Color(30, 55, 30);
+ 
+    static final Color DARK_PANEL         = new Color(45, 45, 45);
+    static final Color DARK_HEADER        = new Color(40, 40, 40);
+
 
     public static void main (String args[]){
+        Preferences prefs = Preferences.userNodeForPackage(TheCal.class);
+        darkMode = prefs.getBoolean("darkMode", false);
+
         mainFrame = new JFrame ("LibreCalendar");
         pane = mainFrame.getContentPane();
         pane.setLayout(new BorderLayout()); // Set the main window to BorderLayout to allow for dynamic component placement
@@ -31,6 +62,12 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
         comboYear = new JComboBox();
         buttonPrev = new JButton ("<<");
         buttonNext = new JButton (">>");
+
+        buttonDarkMode = new JButton("\u263E");
+        buttonDarkMode.setFont(new Font("Serif", Font.PLAIN, 18));
+        buttonDarkMode.setToolTipText("Toggle dark mode");
+        buttonDarkMode.addActionListener(new buttonDarkMode_Action());
+
         mtabelCal = new DefaultTableModel(){public boolean isCellEditable(int rowIndex, int mColIndex){return false;}};
         tabelCal = new JTable(mtabelCal);
         theScrollPane = new JScrollPane(tabelCal);
@@ -42,11 +79,12 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
         buttonNext.addActionListener(new buttonNext_Action());
         comboYear.addActionListener(new comboYear_Action());
         
-        JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
+        headerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
         headerPanel.add(buttonPrev);
         headerPanel.add(LabelMonth);
         headerPanel.add(comboYear);
         headerPanel.add(buttonNext);
+        headerPanel.add(buttonDarkMode);
                 
 
         panelCal.add(headerPanel, BorderLayout.NORTH);
@@ -68,16 +106,30 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
         }
 
         tabelCal.getParent().setBackground(tabelCal.getBackground());
-        tabelCal.getTableHeader().setResizingAllowed(true);
-        tabelCal.getTableHeader().setReorderingAllowed(true);
+        tabelCal.getTableHeader().setResizingAllowed(false);
+        tabelCal.getTableHeader().setReorderingAllowed(false);
         tabelCal.setColumnSelectionAllowed(true);
         tabelCal.setRowSelectionAllowed(true);
         tabelCal.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
         tabelCal.setShowGrid(true);
         tabelCal.setDefaultRenderer(Object.class, new tabelCalRenderer());
+
+        tabelCal.getTableHeader().setDefaultRenderer(new DefaultTableCellRenderer() {
+            public Component getTableCellRendererComponent(JTable table, Object value,
+                    boolean selected, boolean focused, int row, int column) {
+                super.getTableCellRendererComponent(table, value, selected, focused, row, column);
+                setHorizontalAlignment(SwingConstants.LEFT);
+                setBackground(darkMode ? DARK_HEADER : LIGHT_HEADER);
+                setForeground(darkMode ? DARK_TEXT : LIGHT_TEXT);
+                setBorder(BorderFactory.createMatteBorder(0, column == 0 ? 1 : 0, 1, 1,
+                    darkMode ? new Color(40, 40, 40) : new Color(200, 200, 200)));
+                    
+                return this;
+            }
+        });
+
         tabelCal.setGridColor(new Color(225, 225, 225));
-        
         
         for (int i=todayYear-100; i<=todayYear+100; i++){
             comboYear.addItem(String.valueOf(i));
@@ -103,9 +155,50 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
         refreshCalendar (todayMonth, todayYear);
         mainFrame.setMinimumSize(new Dimension(600, 450));
         mainFrame.pack();
+        buttonDarkMode.setText(darkMode ? "\u2600" : "\u263E");
+        applyTheme();
         mainFrame.setVisible(true);
     }
     
+    //  Repaints all non-table UI components to match the current darkMode state
+    public static void applyTheme() {
+        Color bg     = darkMode ? DARK_PANEL  : null;  // null = let Swing use its default
+        Color header = darkMode ? DARK_HEADER : null;
+        Color fg     = darkMode ? DARK_TEXT   : null;
+ 
+        panelCal.setBackground(bg);
+        panelCal.setOpaque(darkMode);
+ 
+        headerPanel.setBackground(header);
+        headerPanel.setOpaque(darkMode);
+ 
+        LabelMonth.setForeground(darkMode ? DARK_TEXT : null);
+        LabelMonth.setBackground(header);
+        LabelMonth.setOpaque(darkMode);
+ 
+        // Force the scroll pane's viewport background to match
+        theScrollPane.getViewport().setBackground(darkMode ? DARK_BG : Color.white);
+        tabelCal.setBackground(darkMode ? DARK_BG : Color.white);
+        tabelCal.setGridColor(darkMode ? new Color(60, 60, 60) : new Color(225, 225, 225));
+        theScrollPane.setBorder(darkMode ? BorderFactory.createLineBorder(DARK_PANEL) 
+        : BorderFactory.createLineBorder(new Color(200, 200, 200)));
+ 
+        // Keep "Calendar" at the top-left readable regardless of theme
+        panelCal.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createLineBorder(darkMode ? DARK_PANEL : Color.gray),
+            "Calendar", 0, 0, null,
+            darkMode ? DARK_TEXT : null
+        ));
+ 
+        mainFrame.getContentPane().setBackground(darkMode ? DARK_PANEL : null);
+        tabelCal.getTableHeader().setOpaque(true);
+
+        tabelCal.getTableHeader().setBackground(darkMode ? DARK_HEADER : LIGHT_HEADER);
+        tabelCal.getTableHeader().setForeground(darkMode ? DARK_TEXT : LIGHT_TEXT);
+        tabelCal.getTableHeader().repaint();
+        tabelCal.repaint(); 
+    }
+
     public static void refreshCalendar(int month, int year){
         String[] months =  {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
         int nod, som;
@@ -165,36 +258,36 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
                 int displayDate = Math.abs(dateVal); // Strips the negative sign
                 setText(String.valueOf(displayDate)); 
                 
-                if (dateVal > 0) { // Current month dates
-                    setForeground(Color.black); // Strong black text
-                    
+                if (dateVal > 0) {
+                    // Current/active month
+                    setForeground(darkMode ? DARK_TEXT : LIGHT_TEXT);
+ 
                     if (selected) {
-                        setBackground(new Color(204, 255, 204)); // Green highlight
+                        setBackground(darkMode ? DARK_SELECTED : LIGHT_SELECTED);
                     } else if (displayDate == todayDay && currentMonth == todayMonth && currentYear == todayYear) { 
-                        setBackground(new Color(255, 220, 220)); // Pink today
-                    } else if (column == 0 || column == 6) { 
-                        setBackground(new Color(235, 235, 255)); // Blue weekend
-                    } else { 
-                        setBackground(Color.white); // Normal white day
+                        setBackground(darkMode ? DARK_TODAY : LIGHT_TODAY);
+                    } else if (column == 0 || column == 6) { // weekend
+                        setBackground(darkMode ? DARK_WEEKEND : LIGHT_WEEKEND);
+                    } else { //weekday
+                        setBackground(darkMode ? DARK_BG : LIGHT_BG);
                     }
-                } else { // Inactive dates from adjacent months
-                    setForeground(new Color(180, 180, 180)); // Very faint gray text
-                    
+                } else {
+                    // Inactive month (prior to & following the current month)
+                    setForeground(darkMode ? DARK_INACTIVE_FG : LIGHT_INACTIVE_FG); 
+ 
                     if (selected) {
-                        setBackground(new Color(235, 255, 235)); // Faint green if clicked
-                    } else if (column == 0 || column == 6) {
-                        // Washed-out, faint pink for inactive weekends
-                        setBackground(new Color(245, 245, 255)); 
-                    } else {
-                        // Plain off-white background for weekdays
-                        setBackground(new Color(250, 250, 250)); 
+                        setBackground(darkMode ? DARK_SEL_INACTIVE : LIGHT_SEL_INACTIVE);
+                    } else if (column == 0 || column == 6) { // weekend
+                        setBackground(darkMode ? DARK_INACTIVE_WKD : LIGHT_INACTIVE_WKD);
+                    } else { // weekday
+                        setBackground(darkMode ? DARK_INACTIVE_WKD2 : LIGHT_INACTIVE_WKD2);
                     }
                 }
             } else {
                 setText("");
-                setBackground(Color.white);
+                setBackground(darkMode ? DARK_BG : LIGHT_BG);
             }
-            
+ 
             return this;
         }
     }
@@ -209,6 +302,16 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
                 currentMonth -= 1;
             }
             refreshCalendar(currentMonth, currentYear);
+        }
+    }
+
+    static class buttonDarkMode_Action implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            darkMode = !darkMode;
+            buttonDarkMode.setText(darkMode ? "\u2600" : "\u263E"); // ☀ or ☾
+            applyTheme();
+            Preferences prefs = Preferences.userNodeForPackage(TheCal.class); // remember theme choice
+            prefs.putBoolean("darkMode", darkMode);
         }
     }
     
