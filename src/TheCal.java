@@ -19,6 +19,7 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
     static int todayYear, todayMonth, todayDay, currentYear, currentMonth;
     static DefaultTableModel mtabelCal;
     static boolean darkMode = false; // [ADDED] tracks current theme state
+    static Map<String, List<String>> reminders = new HashMap<>();
 
     // color palette for both light and dark mode
     static final Color LIGHT_BG           = Color.white;
@@ -45,7 +46,54 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
     static final Color DARK_PANEL         = new Color(45, 45, 45);
     static final Color DARK_HEADER        = new Color(40, 40, 40);
 
-
+    static String reminderKey(int year, int month, int day) {
+        return String.format("%04d-%02d-%02d", year, month + 1, day);
+    }
+    static void showReminderDialog(int year, int month, int day) {
+        String key = reminderKey(year, month, day);
+        String[] months = {"January","February","March","April","May","June",
+                       "July","August","September","October","November","December"};
+        List<String> dayReminders = reminders.computeIfAbsent(key, k -> new ArrayList<>());
+        JDialog dialog = new JDialog(mainFrame, months[month] + " " + day + ", " + year, true);
+        dialog.setLayout(new BorderLayout(10, 10));
+        dialog.setMinimumSize(new Dimension(350, 280));
+        DefaultListModel<String> listModel = new DefaultListModel<>();
+        for (String r : dayReminders) listModel.addElement(r);
+        JList<String> list = new JList<>(listModel);
+        dialog.add(new JScrollPane(list), BorderLayout.CENTER);
+        JPanel bottom = new JPanel(new BorderLayout(5, 5));
+        bottom.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
+        JTextField field = new JTextField();
+        JButton addBtn = new JButton("Add");
+        JButton delBtn = new JButton("Delete");
+        addBtn.addActionListener(e -> {
+            String text = field.getText().trim();
+            if (!text.isEmpty()) {
+                listModel.addElement(text);
+                dayReminders.add(text);
+                field.setText("");
+                tabelCal.repaint();
+            }
+        });
+        field.addActionListener(e -> addBtn.doClick()); // Enter key adds reminder
+        delBtn.addActionListener(e -> {
+            int idx = list.getSelectedIndex();
+            if (idx != -1) {
+                listModel.remove(idx);
+                dayReminders.remove(idx);
+                tabelCal.repaint();
+            }
+        }); 
+        JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        btnRow.add(delBtn);
+        btnRow.add(addBtn);
+        bottom.add(field, BorderLayout.CENTER);
+        bottom.add(btnRow, BorderLayout.SOUTH);
+        dialog.add(bottom, BorderLayout.SOUTH);
+        dialog.pack();
+        dialog.setLocationRelativeTo(mainFrame);
+        dialog.setVisible(true);
+    }
     public static void main (String args[]){
         Preferences prefs = Preferences.userNodeForPackage(TheCal.class);
         darkMode = prefs.getBoolean("darkMode", false);
@@ -144,7 +192,21 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
                 tabelCal.clearSelection(); 
             }
         });
-
+        tabelCal.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int row = tabelCal.rowAtPoint(e.getPoint());
+                    int col = tabelCal.columnAtPoint(e.getPoint());
+                    Object val = mtabelCal.getValueAt(row, col);
+                    if (val != null) {
+                        int dateVal = Integer.parseInt(val.toString());
+                        if (dateVal > 0) { // only open for current month days
+                            showReminderDialog(currentYear, currentMonth, dateVal);
+                        }
+                    }
+                }
+            }
+        });
         // Handle verticle scaling of calendar cells when the window is resized
         theScrollPane.addComponentListener(new ComponentAdapter() {
             public void componentResized(ComponentEvent e) {
@@ -257,7 +319,9 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
                 int dateVal = Integer.parseInt(value.toString());
                 int displayDate = Math.abs(dateVal); // Strips the negative sign
                 setText(String.valueOf(displayDate)); 
-                
+                // Show holiday name as tooltip
+                String holiday = getHolidayName(currentYear, currentMonth, displayDate);
+                setToolTipText(holiday);
                 if (dateVal > 0) {
                     // Current/active month
                     setForeground(darkMode ? DARK_TEXT : LIGHT_TEXT);
@@ -284,14 +348,48 @@ public class TheCal {//Authored by Vaibhav Thakkar, Ariane Quenum, Michael Woelf
                     }
                 }
             } else {
-                setText("");
-                setBackground(darkMode ? DARK_BG : LIGHT_BG);
+                String h = getHolidayName(currentYear, currentMonth, displayDate);
+                setBackground(h != null
+                    ? (darkMode ? new Color(80,65,20) : new Color(255,240,200))
+                    : (darkMode ? DARK_BG : LIGHT_BG));
             }
- 
             return this;
         }
     }
     
+    static String getHolidayName(int year, int month, int day) {
+        Map<String, String> holidays = new HashMap<>();
+        holidays.put("1-1",  "New Year's Day");
+        holidays.put("7-4",  "Independence Day");
+        holidays.put("12-25","Christmas Day");
+        holidays.put("10-31","Halloween");
+        holidays.put("2-14", "Valentine's Day");
+        holidays.put("6-19", "Juneteenth");
+        holidays.put("11-11","Veterans Day");
+    
+        // Check fixed holidays
+        String fixed = holidays.get((month + 1) + "-" + day);
+        if (fixed != null) return fixed;
+    
+        // Thanksgiving: 4th Thursday of November
+        if (month == 10) {
+            GregorianCalendar c = new GregorianCalendar(year, month, 1);
+            int count = 0;
+            while (c.get(Calendar.MONTH) == month) {
+                if (c.get(Calendar.DAY_OF_WEEK) == Calendar.THURSDAY) count++;
+                if (count == 4 && c.get(Calendar.DAY_OF_MONTH) == day) return "Thanksgiving";
+                c.add(Calendar.DAY_OF_MONTH, 1);
+            }
+        }
+        // Labor Day: 1st Monday of September
+        if (month == 8) {
+            GregorianCalendar c = new GregorianCalendar(year, month, 1);
+            while (c.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY)
+                c.add(Calendar.DAY_OF_MONTH, 1);
+            if (c.get(Calendar.DAY_OF_MONTH) == day) return "Labor Day";
+        }
+        return null;
+    }
     static class buttonPrev_Action implements ActionListener{
         public void actionPerformed (ActionEvent e){
             if (currentMonth == 0) {
